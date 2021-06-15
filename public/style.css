@@ -1,0 +1,40 @@
+html, 
+body {
+    height: 100%;
+}
+
+.station {
+    border: 1px solid gray;
+    padding: 35px;
+    width: 23%;
+    margin: 1%;
+    background-color: whitesmoke;
+    border-radius: 7px;
+}
+
+.my-frame {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+
+}
+
+a {
+    color: white;
+}
+
+a:hover{
+    color: whitesmoke;
+}
+
+h1{
+    color: blue;
+}
+
+.down{
+    background-color: rgb(241, 160, 160)!important;
+}
+
+.operating{
+    background-color: lightgreen!important;
+}
