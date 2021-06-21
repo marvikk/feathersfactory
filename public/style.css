@@ -38,3 +38,7 @@ h1{
 .operating{
     background-color: lightgreen!important;
 }
+
+.shiftEnded{
+    background-color: darkgray;
+}

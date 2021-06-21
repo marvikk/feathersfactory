@@ -1,29 +1,26 @@
-//const app = require("../src/app");
+//we need a couple of more buttonsees to start and stop the shift itself
+// - gonna skip the start one, cos that aint needed
+// - not even the stop shift button is needed. the stop event should trigger on itself, but for now will implement it for testing purposes
+// - the stop shift will just save the up and down time data to db. otherwise this should be called automatically
 
-const { default: Timer } = require("easytimer.js");
 
-//const { default: Timer } = require("easytimer.js");
+//we need a new html template to push into the main div
+//the tamplate needs to modify the db
+//the db object might need a couple of new fields to reflect productivity
+//we will need a new route for statistics. i dont think it needs to be pushed into the main div, but well see
 
-//const { default: Timer } = require("easytimer.js");
 
-//const { default: Timer } = require("easytimer.js");
-
-// Establish a Socket.io connection
 const socket = io();
-// Initialize our Feathers client application through Socket.io
-// with hooks and authentication.
 const client = feathers();
 
 client.configure(feathers.socketio(socket));
-// Use localStorage to store our login token
-//client.configure(feathers.authentication());
 
 const stationHTML = (stName, status, id, upTime, downTime) => `
   <h2>Station ${stName}
   </h2>
   <h4>
     <span>Status:</span>
-    <div id="status" style="display: inline-block"> ${status}</div>
+    <div id="status${stName}" style="display: inline-block"> ${status}</div>
   </h4>
   <!-- Text input-->
   <div class="form-group">
@@ -49,16 +46,15 @@ const stationHTML = (stName, status, id, upTime, downTime) => `
     </div>
     </div>
   </div>
-  <button class="btn btn-primary" id="expandBtn${stName}" onclick="expandBtnClicked('${id}', ${stName})">Expand</button>
-  <button class="btn btn-danger" id="stopBtn${stName}" onclick="stopBtnClicked('${id}', ${stName})">Stop</button>
-  <button class="btn btn-success" id="startBtn${stName}" onclick="startBtnClicked('${id}', ${stName})">Start</button>
+  <button class="btn btn-success" style="width: 49%; margin-bottom:5px" id="startBtn${stName}" onclick="startBtnClicked('${id}', ${stName})">Start</button>
+  <button class="btn btn-danger" style="width: 49%; margin-bottom:5px" id="stopBtn${stName}" onclick="stopBtnClicked('${id}', ${stName})">Stop</button>
+  <button class="btn btn-primary" style="width: 100%; margin-bottom:5px" id="expandBtn${stName}" onclick="expandBtnClicked('${id}', ${stName})">Expand</button>
+  <button class="btn btn-primary" style="width: 100%; margin-bottom:5px" id="endBtn${stName}" onclick="endBtnClicked('${id}', ${stName})">End Shift</button>
+
 `
 
 let timers = {
-  0: {
-    upTimer: "chirke",
-    downTimer: "chirke"
-  }
+
 };
 
 let expandBtnClicked = async (id, stName) => {
@@ -66,81 +62,124 @@ let expandBtnClicked = async (id, stName) => {
 }
 
 let startBtnClicked = async (id, stName) => {
-  //1. change the status of the station
-  //2. update db with the new status
+
   await client.service('station').patch(id, { status: "Operating" });
-
-  //2. fetch db to get the upTime state
-  //3. update the UI with the upTime state
-  //4. resume or start the countdown continuing the upTime state
-
-  // var upTimer = timers[stName].upTime;
-  // var downTimer = timers[stName].downTime;
-  // downTimer.pause();
-  // upTimer.start();
-  // upTimer.addEventListener('secondsUpdated', function (e) {
-  //   $('#upTimer' + stName).html(upTimer.getTimeValues().toString());
-  // });
-  // upTimer.addEventListener('started', function (e) {
-  //   $('#upTimer' + stName).html(upTimer.getTimeValues().toString());
-  // });
-  // upTimer.addEventListener('reset', function (e) {
-  //   $('#upTimer' + stName).html(upTimer.getTimeValues().toString());
-  //});
 }
 
 let stopBtnClicked = async (id, stName) => {
   await client.service('station').patch(id, { status: "Down" });
-  console.log(timers);
-  timers[0].upTimer.pause();
+}
 
-  // var upTimer = timers[stName].upTime;
-  // var downTimer = timers[stName].downTime;
-  // downTimer.start();
-  // // upTimer.pause();
-  // downTimer.addEventListener('secondsUpdated', function (e) {
-  //   $('#downTimer' + stName).html(downTimer.getTimeValues().toString());
-  // });
-  // downTimer.addEventListener('started', function (e) {
-  //   $('#downTimer' + stName).html(downTimer.getTimeValues().toString());
-  // });
-  // downTimer.addEventListener('reset', function (e) {
-  //   $('#downTimer' + stName).html(downTimer.getTimeValues().toString());
-  // });
+
+let endBtnClicked = async (id, stName) => {
+
+  await client.service('station').patch(id, {
+    status: "End",
+    upTime: timers[stName].upTimer != null ? timers[stName].upTimer.getTimeValues().toString() : null,
+    downTime: timers[stName].downTimer != null ? timers[stName].downTimer.getTimeValues().toString() : null
+  });
 }
 
 async function init() {
 
   renderStations();
-  //initTimers();
 
-  // Updating the UI with ALL DB changes
+  defineDbChangeEventHandlers();
+
+}
+
+const defineDbChangeEventHandlers = () => {
   client.service('station').on('patched', station => {
 
     var stationId = station.stationId;
-    timers[stationId].upTimer = timers[stationId].upTimer || new Timer();
-    // var downTimer = timers[stationId][downtimerTimer];
 
-    console.log(station);
-    console.log(upTimer);
-    if (station.status == "Operating") {
-      if (upTimer != "chirke") {
-        upTimer.start();
+    handleStationCss(stationId, station.status);
+
+    if (timers[stationId] === undefined) {
+
+      timers[stationId] = {
+        upTimer: null,
+        downTimer: null
       }
-      else {
-        upTimer = new Timer();
-        timers[stationId].upTimer = upTimer;
-        upTimer.start();
-        upTimer.addEventListener('secondsUpdated', function (e) {
-          $('#upTimer' + stationId).html(upTimer.getTimeValues().toString());
+
+    };
+
+    if (station.status == "Operating") {
+      // $('#' + stationId).addClass('operating');
+      // $('#' + stationId).removeClass('down');
+
+      if (timers[stationId].downTimer != null) {
+        timers[stationId].downTimer.pause();
+      }
+
+      timers[stationId].upTimer = timers[stationId].upTimer || new Timer();
+      console.log(timers[stationId].upTimer.getTimeValues().toString() == "00:00:00");
+      if (timers[stationId].upTimer.getTimeValues().toString() == "00:00:00") {
+        timers[stationId].upTimer.start();
+        timers[stationId].upTimer.addEventListener('secondsUpdated', function (e) {
+          $('#upTimer' + stationId).html(timers[stationId].upTimer.getTimeValues().toString());
         });
       }
+      else {
+
+        timers[stationId].upTimer.start();
+      }
+    }
+    else if (station.status == "Down") {
+
+      // $('#' + stationId).addClass('down');
+      // $('#' + stationId).removeClass('operating');
+      if (timers[stationId].upTimer != null) {
+        timers[stationId].upTimer.pause();
+      }
+
+      timers[stationId].downTimer = timers[stationId].downTimer || new Timer();
+      if (timers[stationId].downTimer.getTimeValues().toString() == "00:00:00") {
+        timers[stationId].downTimer.start();
+        timers[stationId].downTimer.addEventListener('secondsUpdated', function (e) {
+          $('#downTimer' + stationId).html(timers[stationId].downTimer.getTimeValues().toString());
+        });
+      }
+      else {
+        timers[stationId].downTimer.start();
+      }
+    }
+    else if (station.status == "End") {
+      // $('#' + stationId).removeClass('operating');
+      // $('#' + stationId).removeClass('down');
+      // $('#' + stationId).addClass('shiftEnded');
+
+      if (timers[stationId].upTimer != null) {
+        timers[stationId].upTimer.stop();
+      }
+      if (timers[stationId].downTimer != null) {
+        timers[stationId].downTimer.stop();
+      }
+      console.log(station);
     }
 
-    //mass render to reflect ALL changes
-    //renderStations();
-    //updatePatchedStation();
   });
+}
+
+const handleStationCss = (stationId, status) => {
+
+  if (status == "Operating") {
+    $('#' + stationId).addClass('operating');
+    $('#' + stationId).removeClass('down');
+    $('#status' + stationId).html('Operating');
+
+  }
+  if (status == "Down") {
+    $('#' + stationId).addClass('down');
+    $('#' + stationId).removeClass('operating');
+    $('#status' + stationId).html('Down');
+  }
+  if (status == "End") {
+    $('#' + stationId).removeClass('operating');
+    $('#' + stationId).removeClass('down');
+    $('#' + stationId).addClass('shiftEnded');
+    $('#status' + stationId).html('Shift Ended');
+  }
 
 }
 
