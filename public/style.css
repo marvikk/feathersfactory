@@ -42,3 +42,15 @@ h1{
 .shiftEnded{
     background-color: darkgray;
 }
+
+.container{
+    margin-top: 50px;
+}
+
+.glyphicon{
+    margin-left: 5px;
+}
+
+.btn-secondary{
+    border: 1px solid darkgray;
+}
